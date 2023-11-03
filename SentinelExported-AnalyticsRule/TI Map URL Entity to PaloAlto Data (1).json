@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/dbc894da-6a7e-4b5f-b3ab-ef7ffef82e9e')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/dbc894da-6a7e-4b5f-b3ab-ef7ffef82e9e')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "TI Map URL Entity to PaloAlto Data",
+        "description": "This query identifies any URL indicators of compromise (IOCs) from threat intelligence (TI) by searching for matches in PaloAlto Data.",
+        "alertDetailsOverride": null,
+        "customDetails": null,
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "columnName": "DeviceName",
+                "identifier": "HostName"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "columnName": "SourceIP",
+                "identifier": "Address"
+              }
+            ]
+          },
+          {
+            "entityType": "URL",
+            "fieldMappings": [
+              {
+                "columnName": "PA_Url",
+                "identifier": "Url"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "let dt_lookBack = 1h;\nlet ioc_lookBack = 14d;\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| where Active == true\n// Picking up only IOC's that contain the entities we want\n| where isnotempty(Url)\n// using innerunique to keep perf fast and result set low, we only need one match to indicate potential malicious activity that needs to be investigated\n| join kind=innerunique (\n  CommonSecurityLog\n  | extend IngestionTime = ingestion_time()\n  | where IngestionTime > ago(dt_lookBack)\n  // Select on Palo Alto logs\n  | where DeviceVendor =~ \"Palo Alto Networks\"\n  | where DeviceEventClassID =~ 'url'\n  //Uncomment the line below to only alert on allowed connections\n  //| where DeviceAction !~ \"block-url\"\n  //Select logs where URL data is populated\n  | extend PA_Url = column_ifexists(\"RequestURL\", \"None\")\n  | extend PA_Url = iif(isempty(PA_Url), extract(\"([^\\\"]+)\", 1, tolower(AdditionalExtensions)), trim('\"', PA_Url))\n  | extend PA_Url = iif(PA_Url !startswith \"http://\" and ApplicationProtocol !~ \"ssl\", strcat('http://', PA_Url), iif(PA_Url !startswith \"https://\" and ApplicationProtocol =~ \"ssl\", strcat('https://', PA_Url), PA_Url))\n  | where isnotempty(PA_Url)\n  | extend CommonSecurityLog_TimeGenerated = TimeGenerated\n) on $left.Url == $right.PA_Url\n| where CommonSecurityLog_TimeGenerated < ExpirationDateTime\n| summarize CommonSecurityLog_TimeGenerated = arg_max(CommonSecurityLog_TimeGenerated, *) by IndicatorId, PA_Url\n| project timestamp = CommonSecurityLog_TimeGenerated, Description, ActivityGroupNames, IndicatorId, ThreatType, ExpirationDateTime, ConfidenceScore, DeviceAction, SourceIP, PA_Url, DeviceName\n",
+        "queryPeriod": "P14D",
+        "queryFrequency": "PT1H",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": null,
+        "templateVersion": "1.2.3",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "106813db-679e-4382-a51b-1bfc463befc3",
+        "enabled": true
+      }
+    }
+  ]
+}
