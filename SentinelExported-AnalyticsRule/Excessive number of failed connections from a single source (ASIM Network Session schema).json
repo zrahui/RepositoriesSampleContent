@@ -1,0 +1,74 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/316dc771-50b3-4906-ac62-6f017cb25f72')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/316dc771-50b3-4906-ac62-6f017cb25f72')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "Excessive number of failed connections from a single source (ASIM Network Session schema)",
+        "description": "This rule identifies a single source that generates an excessive amount of failed connections. Modify the threshold to change the sensitivity of the rule: the higher the threshold, the less sensitive is the rule and less incidents will be generated.<br><br> \n This analytic rule uses [ASIM](https://aka.ms/AboutASIM) and supports any built-in or custom source that supports the ASIM NetworkSession schema",
+        "alertDetailsOverride": {
+          "alertDescriptionFormat": "The client at address {{SrcIpAddr}} generated more than {{threshold}} failures over a 5 minutes time window, which may indicate malicious activity.",
+          "alertDisplayNameFormat": "Excessive number of failed connections from {{SrcIpAddr}}",
+          "alertDynamicProperties": null,
+          "alertSeverityColumnName": null,
+          "alertTacticsColumnName": null
+        },
+        "customDetails": {
+          "NumberOfDenies": "Count"
+        },
+        "entityMappings": [
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "columnName": "SrcIpAddr",
+                "identifier": "Address"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "let threshold = 5000;\n_Im_NetworkSession(eventresult='Failure')\n| summarize Count=count() by SrcIpAddr, bin(TimeGenerated,5m)\n| where Count > threshold\n| extend timestamp = TimeGenerated, threshold\n",
+        "queryPeriod": "PT1H",
+        "queryFrequency": "PT1H",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "templateVersion": "1.2.4",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "4902eddb-34f7-44a8-ac94-8486366e9494",
+        "enabled": true
+      }
+    }
+  ]
+}
