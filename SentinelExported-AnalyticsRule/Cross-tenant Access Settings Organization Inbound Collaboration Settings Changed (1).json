@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ff217c19-e93f-4033-82c3-90d3b204bec3')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ff217c19-e93f-4033-82c3-90d3b204bec3')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "Cross-tenant Access Settings Organization Inbound Collaboration Settings Changed",
+        "description": "Organizations are added in the Cross-tenant Access Settings to control communication inbound or outbound for users and applications. This detection notifies when Organization Inbound Collaboration Settings are changed for \"Users & Groups\" and for \"Applications\".",
+        "alertDetailsOverride": null,
+        "customDetails": null,
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "columnName": "Name",
+                "identifier": "Name"
+              },
+              {
+                "columnName": "UPNSuffix",
+                "identifier": "UPNSuffix"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "columnName": "InitiatedByIPAdress",
+                "identifier": "Address"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "//In User & Groups and in Applications, the following \"AccessType\" values in columns PremodifiedInboundSettings and ModifiedInboundSettings are interpreted accordingly:\n// When Access Type in premodified inbound settings value was 1 that means that the initial access was allowed. When Access Type in premodified inbound settings value was 2 that means that the initial access was blocked. \n// When Access Type in modified inbound settings value is 1 that means that now access is allowed. When Access Type in modified inbound settings value is 2 that means that now access is blocked. \nAuditLogs\n| where OperationName has \"Update a partner cross-tenant access setting\"\n| mv-apply TargetResource = TargetResources on\n  (\n      where TargetResource.type =~ \"Policy\"\n      | extend Properties = TargetResource.modifiedProperties\n  )\n| mv-apply Property = Properties on\n  (\n      where Property.displayName =~ \"b2bCollaborationInbound\"\n      | extend PremodifiedInboundSettings = trim('\"',tostring(Property.oldValue)),\n               ModifiedInboundSettings = trim(@'\"',tostring(Property.newValue))\n  )\n| extend InitiatedByActionUserInformation = iff(isnotempty(InitiatedBy.user.userPrincipalName), InitiatedBy.user.userPrincipalName, InitiatedBy.app.displayName)\n| extend InitiatedByIPAdress = InitiatedBy.user.ipAddress\n| where PremodifiedInboundSettings != ModifiedInboundSettings\n| extend Name = tostring(split(InitiatedByActionUserInformation,'@',0)[0]), UPNSuffix = tostring(split(InitiatedByActionUserInformation,'@',1)[0])\n",
+        "queryPeriod": "P2D",
+        "queryFrequency": "P2D",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "InitialAccess",
+          "Persistence",
+          "Discovery"
+        ],
+        "techniques": [
+          "T1078",
+          "T1136",
+          "T1087"
+        ],
+        "templateVersion": "1.0.1",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "c895c5b9-0fc6-40ce-9830-e8818862f2d5",
+        "enabled": true
+      }
+    }
+  ]
+}
