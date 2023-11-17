@@ -1,0 +1,73 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/95d788a4-7b5f-4a02-a6ae-82aa788437a2')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/95d788a4-7b5f-4a02-a6ae-82aa788437a2')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "TI Map URL Entity to SecurityAlert Data",
+        "description": "This query identifies any URL indicators of compromise (IOCs) from threat intelligence (TI) by searching for matches in SecurityAlert data.",
+        "alertDetailsOverride": null,
+        "customDetails": null,
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "columnName": "Compromised_Host",
+                "identifier": "HostName"
+              }
+            ]
+          },
+          {
+            "entityType": "URL",
+            "fieldMappings": [
+              {
+                "columnName": "Url",
+                "identifier": "Url"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "let dt_lookBack = 1h;\nlet ioc_lookBack = 14d;\nlet URLRegex = \"((https?|ftp|ldap|wss?|file):\\\\/\\\\/(([\\\\:\\\\%\\\\w\\\\_\\\\-]+(\\\\.|@))*((xn--)?[a-zA-Z0-9\\\\-]+\\\\.)+(xn--[a-z0-9]+|[A-Za-z]+)|\\\\d{1,3}\\\\.\\\\d{1,3}\\\\.\\\\d{1,3}\\\\.\\\\d{0,3})[.,:\\\\w@?^=%&\\\\/~+#-]*[\\\\w@?^=%&\\\\/~+#-])\";\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| where Active == true\n// Picking up only IOC's that contain the entities we want\n| where isnotempty(Url)\n// using innerunique to keep perf fast and result set low, we only need one match to indicate potential malicious activity that needs to be investigated\n| join kind=innerunique (\nSecurityAlert\n| where TimeGenerated >= ago(dt_lookBack)\n| extend MSTI = case(AlertName has \"TI map\" and VendorName == \"Microsoft\" and ProductName == 'Azure Sentinel', true, false)\n| where MSTI == false\n// Extract URL from JSON data\n| extend Url = todynamic(dynamic_to_json(extract_all(URLRegex, dynamic([1]), Entities)))  \n| mv-expand Url\n| extend Url = tostring(Url[0])\n// We only want alerts that actually contain URL data\n| where isnotempty(Url)\n// Extract hostname from JSON data for entity mapping\n| extend Compromised_Host = tostring(parse_json(ExtendedProperties).[\"Compromised Host\"])\n| extend Alert_TimeGenerated = TimeGenerated\n) on Url\n| where Alert_TimeGenerated < ExpirationDateTime\n| summarize Alert_TimeGenerated = arg_max(Alert_TimeGenerated, *) by IndicatorId, AlertName\n| project timestamp = Alert_TimeGenerated, ActivityGroupNames, IndicatorId, ThreatType, ExpirationDateTime, ConfidenceScore, AlertName, AlertSeverity, Description, Url, Compromised_Host\n",
+        "queryPeriod": "P14D",
+        "queryFrequency": "PT1H",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": null,
+        "templateVersion": "1.2.6",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "f30a47c1-65fb-42b1-a7f4-00941c12550b",
+        "enabled": true
+      }
+    }
+  ]
+}
