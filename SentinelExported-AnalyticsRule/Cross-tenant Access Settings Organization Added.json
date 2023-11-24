@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b42ce6d5-934a-41ff-8c09-530841be9bd0')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b42ce6d5-934a-41ff-8c09-530841be9bd0')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "Cross-tenant Access Settings Organization Added",
+        "description": "Organizations are added in the Cross-tenant Access Settings to control communication inbound or outbound for users and applications. This detection notifies when an Organization is added other than the list that is supposed to exist from the Azure AD Cross-tenant Access Settings.",
+        "alertDetailsOverride": null,
+        "customDetails": null,
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "columnName": "Name",
+                "identifier": "Name"
+              },
+              {
+                "columnName": "UPNSuffix",
+                "identifier": "UPNSuffix"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "columnName": "InitiatedByIPAdress",
+                "identifier": "Address"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "// Tenants IDs can be found by navigating to Azure Active Directory then from menu on the left, select External Identities, then from menu on the left, select Cross-tenant access settings and from the list shown of Tenants\nlet ExpectedTenantIDs = dynamic([\"List of expected tenant IDs\",\"Tenant ID 2\"]);\nAuditLogs\n| where OperationName has \"Add a partner to cross-tenant access setting\"\n| extend InitiatedByActionUserInformation = iff(isnotempty(InitiatedBy.user.userPrincipalName), InitiatedBy.user.userPrincipalName, InitiatedBy.app.displayName)\n| extend InitiatedByIPAdress = InitiatedBy.user.ipAddress\n| mv-apply TargetResource = TargetResources on\n  (\n      where TargetResource.type =~ \"Policy\"\n      | extend Properties = TargetResource.modifiedProperties\n  )\n| mv-apply Property = Properties on\n  (\n      where Property.displayName =~ \"tenantId\"\n      | extend ExtTenantIDAdded = trim('\"',tostring(Property.newValue))\n  )\n| where ExtTenantIDAdded !in (ExpectedTenantIDs)\n| extend Name = tostring(split(InitiatedByActionUserInformation,'@',0)[0]), UPNSuffix = tostring(split(InitiatedByActionUserInformation,'@',1)[0])\n",
+        "queryPeriod": "P2D",
+        "queryFrequency": "P2D",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "InitialAccess",
+          "Persistence",
+          "Discovery"
+        ],
+        "techniques": [
+          "T1078",
+          "T1136",
+          "T1087"
+        ],
+        "templateVersion": "1.0.1",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "757e6a79-6d23-4ae6-9845-4dac170656b5",
+        "enabled": true
+      }
+    }
+  ]
+}
