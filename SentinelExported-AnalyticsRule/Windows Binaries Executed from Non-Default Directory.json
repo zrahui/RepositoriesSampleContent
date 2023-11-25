@@ -1,0 +1,92 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d9e7a4b8-29ec-460d-9ead-6f4c77ec7d5a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d9e7a4b8-29ec-460d-9ead-6f4c77ec7d5a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "Windows Binaries Executed from Non-Default Directory",
+        "description": "The query detects Windows binaries, that can be executed from a non-default directory (e.g. C:\\Windows\\, C:\\Windows\\System32 etc.). \nRef: https://lolbas-project.github.io/",
+        "alertDetailsOverride": null,
+        "customDetails": null,
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "columnName": "Name",
+                "identifier": "Name"
+              },
+              {
+                "columnName": "UPNSuffix",
+                "identifier": "UPNSuffix"
+              }
+            ]
+          },
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "columnName": "HostName",
+                "identifier": "HostName"
+              },
+              {
+                "columnName": "DnsDomain",
+                "identifier": "DnsDomain"
+              }
+            ]
+          },
+          {
+            "entityType": "Process",
+            "fieldMappings": [
+              {
+                "columnName": "CommandLine",
+                "identifier": "CommandLine"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "let procList = externaldata(Process:string) [@\"https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/Sample%20Data/Microsoft_Lolbas_Execution_Binaries.csv\"] with (format=\"csv\", ignoreFirstRecord=True);\nSecurityEvent\n| where EventID == 4688 and Process has_any (procList) and not (NewProcessName has (\"C:\\\\Windows\\\\\"))\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by EventID, Computer, SubjectUserName, NewProcessName, Process, CommandLine\n| extend Name=tostring(split(SubjectUserName, \"@\")[0]), UPNSuffix=tostring(split(SubjectUserName, \"@\")[1])\n| extend HostName = iif(Computer has '.',substring(Computer,0,indexof(Computer,'.')),Computer) , DnsDomain = iif(Computer has '.',substring(Computer,indexof(Computer,'.')+1),'')\n",
+        "queryPeriod": "PT1H",
+        "queryFrequency": "PT1H",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "Execution"
+        ],
+        "techniques": [
+          "T1059"
+        ],
+        "templateVersion": "1.0.2",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "15049017-527f-4d3b-b011-b0e99e68ef45",
+        "enabled": true
+      }
+    }
+  ]
+}
