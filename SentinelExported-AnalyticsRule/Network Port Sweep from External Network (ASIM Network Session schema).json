@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/12801a55-5ea4-4d1c-8c43-3a0296799141')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/12801a55-5ea4-4d1c-8c43-3a0296799141')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "Network Port Sweep from External Network (ASIM Network Session schema)",
+        "description": "This detection rule detects scenarios when a particular port is being scanned by multiple external sources. The rule utilize [ASIM](https://aka.ms/AboutASIM) normalization, and is applied to any source which supports the ASIM Network Session schema.",
+        "alertDetailsOverride": {
+          "alertDescriptionFormat": "Network Port Sweep was detection by multiple IPs",
+          "alertDisplayNameFormat": "Network Port Sweep detected on {{DstPortNumber}}",
+          "alertDynamicProperties": null,
+          "alertSeverityColumnName": null,
+          "alertTacticsColumnName": null
+        },
+        "customDetails": {
+          "AllDstIpAddr": "set_DstIpAddr"
+        },
+        "entityMappings": null,
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "let lookback = 1h;\nlet threshold = 20;\n_Im_NetworkSession(starttime=ago(lookback),endtime=now())\n| where NetworkDirection == \"Inbound\"\n| summarize make_set(DstIpAddr,100) by DstPortNumber\n| where array_length(set_DstIpAddr) > threshold\n",
+        "queryPeriod": "PT1H",
+        "queryFrequency": "PT1H",
+        "sentinelEntitiesMappings": null,
+        "severity": "High",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "Discovery"
+        ],
+        "techniques": null,
+        "templateVersion": "1.0.2",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "cd8faa84-4464-4b4e-96dc-b22f50c27541",
+        "enabled": true
+      }
+    }
+  ]
+}
