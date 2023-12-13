@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f4487ce9-8be3-4bc9-bf4a-0fac5b68ab76')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f4487ce9-8be3-4bc9-bf4a-0fac5b68ab76')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "Registry Persistence via AppCert DLL Modification",
+        "description": "Adversaries may establish persistence and/or elevate privileges by executing malicious content triggered by AppCert DLLs loaded into processes. \nDynamic-link libraries (DLLs) that are specified in the AppCertDLLs Registry key under HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\ are loaded into every process that calls the ubiquitously used application programming interface (API) functions CreateProcess, CreateProcessAsUser, CreateProcessWithLoginW, CreateProcessWithTokenW, or WinExec.\nRef: https://attack.mitre.org/techniques/T1546/009/",
+        "alertDetailsOverride": null,
+        "customDetails": null,
+        "entityMappings": [
+          {
+            "entityType": "RegistryKey",
+            "fieldMappings": [
+              {
+                "columnName": "TargetObject",
+                "identifier": "Key"
+              }
+            ]
+          },
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "columnName": "HostName",
+                "identifier": "HostName"
+              },
+              {
+                "columnName": "DnsDomain",
+                "identifier": "DnsDomain"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "Event\n| where EventLog =~ \"Microsoft-Windows-Sysmon/Operational\" and EventID in (13)\n| parse EventData with * 'TargetObject\">' TargetObject \"<\" * 'Details\">' Details \"<\" * \n| where TargetObject has (\"\\\\Control\\\\Session Manager\\\\AppCertDLLs\\\\\")\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated) by EventID, Computer,  TargetObject, Details\n| extend HostName = iif(Computer has '.',substring(Computer,0,indexof(Computer,'.')),Computer) , DnsDomain = iif(Computer has '.',substring(Computer,indexof(Computer,'.')+1),'')\n",
+        "queryPeriod": "PT1H",
+        "queryFrequency": "PT1H",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "Persistence"
+        ],
+        "techniques": [
+          "T1546"
+        ],
+        "templateVersion": "1.0.1",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "c61ad0ac-ad68-4ebb-b41a-74296d3e0044",
+        "enabled": true
+      }
+    }
+  ]
+}
