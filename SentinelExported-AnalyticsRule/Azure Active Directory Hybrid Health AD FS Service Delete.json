@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/099c24ad-fb5e-49e2-b861-9c6449d01f27')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/099c24ad-fb5e-49e2-b861-9c6449d01f27')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-02-01-preview",
+      "properties": {
+        "displayName": "Azure Active Directory Hybrid Health AD FS Service Delete",
+        "description": "This detection uses AzureActivity logs (Administrative category) to identify the deletion of an Azure AD Hybrid Health AD FS service instance in a tenant.\nA threat actor can create a new AD Health ADFS service and create a fake server to spoof AD FS signing logs.\nThe health AD FS service can then be deleted after it is no longer needed via HTTP requests to Azure.\nMore information is available in this blog https://o365blog.com/post/hybridhealthagent/",
+        "alertDetailsOverride": null,
+        "customDetails": null,
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "columnName": "Name",
+                "identifier": "Name"
+              },
+              {
+                "columnName": "UPNSuffix",
+                "identifier": "UPNSuffix"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "columnName": "CallerIpAddress",
+                "identifier": "Address"
+              }
+            ]
+          }
+        ],
+        "eventGroupingSettings": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "groupByAlertDetails": null,
+            "groupByCustomDetails": null,
+            "groupByEntities": [],
+            "lookbackDuration": "PT5M",
+            "matchingMethod": "AllEntities",
+            "reopenClosedIncident": false
+          }
+        },
+        "query": "AzureActivity\n| where CategoryValue =~ 'Administrative'\n| where ResourceProviderValue =~ 'Microsoft.ADHybridHealthService'\n| where _ResourceId has 'AdFederationService'\n| where OperationNameValue =~ 'Microsoft.ADHybridHealthService/services/delete'\n| extend claimsJson = parse_json(Claims)\n| extend AppId = tostring(claimsJson.appid), AccountName = tostring(claimsJson.name), Name = tostring(split(Caller,'@',0)[0]), UPNSuffix = tostring(split(Caller,'@',1)[0])\n| project-away claimsJson\n",
+        "queryPeriod": "P1D",
+        "queryFrequency": "P1D",
+        "sentinelEntitiesMappings": null,
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1578"
+        ],
+        "templateVersion": "2.0.1",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "alertRuleTemplateName": "86a036b2-3686-42eb-b417-909fc0867771",
+        "enabled": true
+      }
+    }
+  ]
+}
